@@ -132,58 +132,76 @@ export default function Home() {
     setProgress(0)
     setError("")
 
-    Papa.parse(file, {
-      header: true,
-      skipEmptyLines: true,
-      complete: async (results) => {
-        try {
-          const rows: GeocodedRow[] = results.data as GeocodedRow[]
-          const geocodedRows: GeocodedRow[] = []
+    // Read file with specified encoding
+    const reader = new FileReader()
+    reader.onload = (event) => {
+      try {
+        const arrayBuffer = event.target?.result as ArrayBuffer
+        const decoder = new TextDecoder(inputEncoding)
+        const text = decoder.decode(arrayBuffer)
 
-          for (let i = 0; i < rows.length; i++) {
-            const row = rows[i]
-            const address = row[addressColumn] as string
+        Papa.parse(text, {
+          header: true,
+          skipEmptyLines: true,
+          complete: async (results) => {
+            try {
+              const rows: GeocodedRow[] = results.data as GeocodedRow[]
+              const geocodedRows: GeocodedRow[] = []
 
-            if (address) {
-              const coords = await geocodeAddress(address)
-              if (coords) {
-                geocodedRows.push({
-                  ...row,
-                  latitude: coords.lat,
-                  longitude: coords.lng,
-                  geocoding_status: "成功",
-                })
-              } else {
-                geocodedRows.push({
-                  ...row,
-                  geocoding_status: "失敗",
-                  error_message: "結果が見つかりません",
-                })
+              for (let i = 0; i < rows.length; i++) {
+                const row = rows[i]
+                const address = row[addressColumn] as string
+
+                if (address) {
+                  const coords = await geocodeAddress(address)
+                  if (coords) {
+                    geocodedRows.push({
+                      ...row,
+                      latitude: coords.lat,
+                      longitude: coords.lng,
+                      geocoding_status: "成功",
+                    })
+                  } else {
+                    geocodedRows.push({
+                      ...row,
+                      geocoding_status: "失敗",
+                      error_message: "結果が見つかりません",
+                    })
+                  }
+                } else {
+                  geocodedRows.push({
+                    ...row,
+                    geocoding_status: "スキップ",
+                    error_message: "住所が空です",
+                  })
+                }
+
+                setProgress(Math.round(((i + 1) / rows.length) * 100))
               }
-            } else {
-              geocodedRows.push({
-                ...row,
-                geocoding_status: "スキップ",
-                error_message: "住所が空です",
-              })
+
+              setData(geocodedRows)
+              setSuccess(true)
+            } catch (err) {
+              setError(`処理エラー: ${err instanceof Error ? err.message : String(err)}`)
+            } finally {
+              setLoading(false)
             }
-
-            setProgress(Math.round(((i + 1) / rows.length) * 100))
-          }
-
-          setData(geocodedRows)
-          setSuccess(true)
-        } catch (err) {
-          setError(`処理エラー: ${err instanceof Error ? err.message : String(err)}`)
-        } finally {
-          setLoading(false)
-        }
-      },
-      error: (error) => {
-        setError(`CSVの読み込みエラー: ${error.message}`)
+          },
+          error: (error: { message: string }) => {
+            setError(`CSVの読み込みエラー: ${error.message}`)
+            setLoading(false)
+          },
+        })
+      } catch (err) {
+        setError(`ファイル読み込みエラー: ${err instanceof Error ? err.message : String(err)}`)
         setLoading(false)
-      },
-    })
+      }
+    }
+    reader.onerror = () => {
+      setError("ファイルの読み込みに失敗しました")
+      setLoading(false)
+    }
+    reader.readAsArrayBuffer(file)
   }
 
   const handleDownload = () => {
