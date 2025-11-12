@@ -29,6 +29,7 @@ export default function Home() {
   const [error, setError] = useState<string>("")
   const [success, setSuccess] = useState(false)
   const [geocoderReady, setGeocoderReady] = useState(false)
+  const [inputEncoding, setInputEncoding] = useState<string>("UTF-8")
 
   // Load Community Geocoder script
   useEffect(() => {
@@ -60,23 +61,39 @@ export default function Home() {
     setData([])
     setProgress(0)
 
-    // Parse CSV to detect columns
-    Papa.parse(selectedFile, {
-      header: true,
-      skipEmptyLines: true,
-      complete: (results) => {
-        if (results.data.length > 0) {
-          const cols = Object.keys(results.data[0] as Record<string, unknown>)
-          setColumns(cols)
-          if (!addressColumn && cols.length > 0) {
-            setAddressColumn(cols[0])
-          }
-        }
-      },
-      error: (error) => {
-        setError(`CSVの読み込みエラー: ${error.message}`)
-      },
-    })
+    // Read file with specified encoding
+    const reader = new FileReader()
+    reader.onload = (event) => {
+      try {
+        const arrayBuffer = event.target?.result as ArrayBuffer
+        const decoder = new TextDecoder(inputEncoding)
+        const text = decoder.decode(arrayBuffer)
+
+        // Parse CSV to detect columns
+        Papa.parse(text, {
+          header: true,
+          skipEmptyLines: true,
+          complete: (results) => {
+            if (results.data.length > 0) {
+              const cols = Object.keys(results.data[0] as Record<string, unknown>)
+              setColumns(cols)
+              if (!addressColumn && cols.length > 0) {
+                setAddressColumn(cols[0])
+              }
+            }
+          },
+          error: (error: { message: string }) => {
+            setError(`CSVの読み込みエラー: ${error.message}`)
+          },
+        })
+      } catch (err) {
+        setError(`ファイル読み込みエラー: ${err instanceof Error ? err.message : String(err)}`)
+      }
+    }
+    reader.onerror = () => {
+      setError("ファイルの読み込みに失敗しました")
+    }
+    reader.readAsArrayBuffer(selectedFile)
   }
 
   const geocodeAddress = (address: string): Promise<{ lat: number; lng: number } | null> => {
@@ -176,7 +193,10 @@ export default function Home() {
     }
 
     const csv = Papa.unparse(data)
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" })
+
+    // Create CSV with BOM for Excel (both UTF-8 and encoding compatibility)
+    const bom = new Uint8Array([0xEF, 0xBB, 0xBF]) // UTF-8 BOM
+    const blob = new Blob([bom, csv], { type: "text/csv;charset=utf-8;" })
     const link = document.createElement("a")
     const url = URL.createObjectURL(blob)
 
@@ -235,6 +255,52 @@ export default function Home() {
               </label>
             </div>
           </div>
+
+          {/* Input Encoding Selection */}
+          {file && (
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                入力ファイルの文字コード
+              </label>
+              <select
+                value={inputEncoding}
+                onChange={(e) => {
+                  setInputEncoding(e.target.value)
+                  // Re-read file with new encoding
+                  const reader = new FileReader()
+                  reader.onload = (event) => {
+                    try {
+                      const arrayBuffer = event.target?.result as ArrayBuffer
+                      const decoder = new TextDecoder(e.target.value)
+                      const text = decoder.decode(arrayBuffer)
+
+                      Papa.parse(text, {
+                        header: true,
+                        skipEmptyLines: true,
+                        complete: (results) => {
+                          if (results.data.length > 0) {
+                            const cols = Object.keys(results.data[0] as Record<string, unknown>)
+                            setColumns(cols)
+                            setAddressColumn(cols[0] || "")
+                          }
+                        },
+                        error: (error: { message: string }) => {
+                          setError(`CSVの読み込みエラー: ${error.message}`)
+                        },
+                      })
+                    } catch (err) {
+                      setError(`ファイル読み込みエラー: ${err instanceof Error ? err.message : String(err)}`)
+                    }
+                  }
+                  reader.readAsArrayBuffer(file)
+                }}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value="UTF-8">UTF-8</option>
+                <option value="Shift_JIS">Shift_JIS (シフトJIS)</option>
+              </select>
+            </div>
+          )}
 
           {/* Column Selection */}
           {columns.length > 0 && (
@@ -364,6 +430,8 @@ export default function Home() {
             <li>• すべてのデータはブラウザ上で処理 - サーバーにアップロードされません</li>
             <li>• 出力CSVに自動的に緯度・経度列が追加されます</li>
             <li>• 地図作成やロケーションベースの分析に最適です</li>
+            <li>• 入力ファイルの文字コード（UTF-8 / Shift_JIS）を選択可能</li>
+            <li>• 出力ファイルはUTF-8（BOM付き）でダウンロード - Excel で正しく表示されます</li>
           </ul>
         </div>
       </div>
