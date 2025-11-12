@@ -2,7 +2,6 @@
 const nextConfig = {
   reactStrictMode: true,
   output: 'export',
-  basePath: '/address-to-latlon',
   trailingSlash: true,
 }
 
