@@ -22,7 +22,7 @@ interface GeocodedRow {
 export default function Home() {
   const [file, setFile] = useState<File | null>(null)
   const [data, setData] = useState<GeocodedRow[]>([])
-  const [addressColumn, setAddressColumn] = useState<string>("")
+  const [addressColumns, setAddressColumns] = useState<string[]>([])
   const [columns, setColumns] = useState<string[]>([])
   const [loading, setLoading] = useState(false)
   const [progress, setProgress] = useState(0)
@@ -77,8 +77,8 @@ export default function Home() {
             if (results.data.length > 0) {
               const cols = Object.keys(results.data[0] as Record<string, unknown>)
               setColumns(cols)
-              if (!addressColumn && cols.length > 0) {
-                setAddressColumn(cols[0])
+              if (addressColumns.length === 0 && cols.length > 0) {
+                setAddressColumns([cols[0]])
               }
             }
           },
@@ -118,7 +118,7 @@ export default function Home() {
   }
 
   const handleProcess = async () => {
-    if (!file || !addressColumn) {
+    if (!file || addressColumns.length === 0) {
       setError("ファイルと住所列を選択してください")
       return
     }
@@ -150,7 +150,16 @@ export default function Home() {
 
               for (let i = 0; i < rows.length; i++) {
                 const row = rows[i]
-                const address = row[addressColumn] as string
+
+                // 複数列の値を結合して住所を作成
+                const addressParts = addressColumns
+                  .map((col) => {
+                    const value = row[col]
+                    return value ? String(value).trim() : ""
+                  })
+                  .filter((part) => part.length > 0)
+
+                const address = addressParts.join("")
 
                 if (address) {
                   const coords = await geocodeAddress(address)
@@ -215,8 +224,13 @@ export default function Home() {
     const link = document.createElement("a")
     const url = URL.createObjectURL(blob)
 
+    // Generate filename from original file name
+    const originalFileName = file?.name || "data.csv"
+    const fileNameWithoutExt = originalFileName.replace(/\.csv$/i, "")
+    const downloadFileName = `${fileNameWithoutExt}_geocoded.csv`
+
     link.setAttribute("href", url)
-    link.setAttribute("download", "ジオコーディング済み_データ.csv")
+    link.setAttribute("download", downloadFileName)
     link.style.visibility = "hidden"
 
     document.body.appendChild(link)
@@ -296,7 +310,7 @@ export default function Home() {
                           if (results.data.length > 0) {
                             const cols = Object.keys(results.data[0] as Record<string, unknown>)
                             setColumns(cols)
-                            setAddressColumn(cols[0] || "")
+                            setAddressColumns([cols[0] || ""])
                           }
                         },
                         error: (error: { message: string }) => {
@@ -321,20 +335,32 @@ export default function Home() {
           {columns.length > 0 && (
             <div className="mb-6">
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                住所が含まれている列を選択
+                住所が含まれている列を選択（複数選択可能）
               </label>
-              <select
-                value={addressColumn}
-                onChange={(e) => setAddressColumn(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              >
-                <option value="">列を選択...</option>
+              <div className="space-y-2 p-3 border border-gray-300 rounded-lg bg-gray-50">
                 {columns.map((col) => (
-                  <option key={col} value={col}>
-                    {col}
-                  </option>
+                  <label key={col} className="flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={addressColumns.includes(col)}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setAddressColumns([...addressColumns, col])
+                        } else {
+                          setAddressColumns(addressColumns.filter((c) => c !== col))
+                        }
+                      }}
+                      className="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
+                    />
+                    <span className="ml-2 text-sm text-gray-700">{col}</span>
+                  </label>
                 ))}
-              </select>
+              </div>
+              {addressColumns.length > 0 && (
+                <p className="text-xs text-gray-600 mt-2">
+                  選択中: {addressColumns.join(" + ")}
+                </p>
+              )}
             </div>
           )}
 
@@ -342,9 +368,9 @@ export default function Home() {
           <div className="mb-6">
             <button
               onClick={handleProcess}
-              disabled={!file || !addressColumn || loading || !geocoderReady}
+              disabled={!file || addressColumns.length === 0 || loading || !geocoderReady}
               className={`w-full py-3 px-4 rounded-lg font-medium text-white transition ${
-                loading || !file || !addressColumn || !geocoderReady
+                loading || !file || addressColumns.length === 0 || !geocoderReady
                   ? "bg-gray-400 cursor-not-allowed"
                   : "bg-blue-600 hover:bg-blue-700"
               }`}
@@ -377,7 +403,7 @@ export default function Home() {
                 <table className="min-w-full border-collapse">
                   <thead>
                     <tr className="bg-gray-100">
-                      {[addressColumn, "緯度", "経度", "ステータス"].map((col) => (
+                      {["住所", "緯度", "経度", "ステータス"].map((col) => (
                         <th
                           key={col}
                           className="border border-gray-300 px-3 py-2 text-left text-sm font-medium text-gray-700"
@@ -388,32 +414,39 @@ export default function Home() {
                     </tr>
                   </thead>
                   <tbody>
-                    {data.slice(0, 5).map((row, idx) => (
-                      <tr key={idx} className="hover:bg-gray-50">
-                        <td className="border border-gray-300 px-3 py-2 text-sm">
-                          {row[addressColumn]}
-                        </td>
-                        <td className="border border-gray-300 px-3 py-2 text-sm">
-                          {row.latitude?.toFixed(6) || "-"}
-                        </td>
-                        <td className="border border-gray-300 px-3 py-2 text-sm">
-                          {row.longitude?.toFixed(6) || "-"}
-                        </td>
-                        <td className="border border-gray-300 px-3 py-2 text-sm">
-                          <span
-                            className={`px-2 py-1 rounded text-xs font-medium ${
-                              row.geocoding_status === "成功"
-                                ? "bg-green-100 text-green-800"
-                                : row.geocoding_status === "失敗"
-                                  ? "bg-red-100 text-red-800"
-                                  : "bg-yellow-100 text-yellow-800"
-                            }`}
-                          >
-                            {row.geocoding_status}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
+                    {data.slice(0, 5).map((row, idx) => {
+                      // 選択列の値を結合して表示
+                      const displayAddress = addressColumns
+                        .map((col) => row[col])
+                        .filter((val) => val)
+                        .join("")
+                      return (
+                        <tr key={idx} className="hover:bg-gray-50">
+                          <td className="border border-gray-300 px-3 py-2 text-sm">
+                            {displayAddress}
+                          </td>
+                          <td className="border border-gray-300 px-3 py-2 text-sm">
+                            {row.latitude?.toFixed(6) || "-"}
+                          </td>
+                          <td className="border border-gray-300 px-3 py-2 text-sm">
+                            {row.longitude?.toFixed(6) || "-"}
+                          </td>
+                          <td className="border border-gray-300 px-3 py-2 text-sm">
+                            <span
+                              className={`px-2 py-1 rounded text-xs font-medium ${
+                                row.geocoding_status === "成功"
+                                  ? "bg-green-100 text-green-800"
+                                  : row.geocoding_status === "失敗"
+                                    ? "bg-red-100 text-red-800"
+                                    : "bg-yellow-100 text-yellow-800"
+                              }`}
+                            >
+                              {row.geocoding_status}
+                            </span>
+                          </td>
+                        </tr>
+                      )
+                    })}
                   </tbody>
                 </table>
               </div>
