@@ -193,10 +193,7 @@ export default function Home() {
     }
 
     const csv = Papa.unparse(data)
-
-    // Create CSV with BOM for Excel (both UTF-8 and encoding compatibility)
-    const bom = new Uint8Array([0xEF, 0xBB, 0xBF]) // UTF-8 BOM
-    const blob = new Blob([bom, csv], { type: "text/csv;charset=utf-8;" })
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" })
     const link = document.createElement("a")
     const url = URL.createObjectURL(blob)
 
@@ -431,7 +428,7 @@ export default function Home() {
             <li>• 出力CSVに自動的に緯度・経度列が追加されます</li>
             <li>• 地図作成やロケーションベースの分析に最適です</li>
             <li>• 入力ファイルの文字コード（UTF-8 / Shift_JIS）を選択可能</li>
-            <li>• 出力ファイルはUTF-8（BOM付き）でダウンロード - Excel で正しく表示されます</li>
+            <li>• 出力ファイルはUTF-8でダウンロード</li>
           </ul>
         </div>
       </div>
