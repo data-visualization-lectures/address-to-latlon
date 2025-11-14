@@ -30,6 +30,7 @@ export default function Home() {
   const [success, setSuccess] = useState(false)
   const [geocoderReady, setGeocoderReady] = useState(false)
   const [inputEncoding, setInputEncoding] = useState<string>("UTF-8")
+  const [coordinateFormat, setCoordinateFormat] = useState<"separate" | "combined">("separate")
 
   // Load Community Geocoder script
   useEffect(() => {
@@ -213,13 +214,27 @@ export default function Home() {
     reader.readAsArrayBuffer(file)
   }
 
+  const buildExportRows = () => {
+    if (coordinateFormat === "combined") {
+      return data.map((row) => {
+        const { latitude, longitude, ...rest } = row
+        return {
+          ...rest,
+          lat_lon:
+            typeof latitude === "number" && typeof longitude === "number" ? `${latitude},${longitude}` : "",
+        }
+      })
+    }
+    return data
+  }
+
   const handleDownload = () => {
     if (data.length === 0) {
       setError("ダウンロードするデータがありません")
       return
     }
 
-    const csv = Papa.unparse(data)
+    const csv = Papa.unparse(buildExportRows())
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" })
     const link = document.createElement("a")
     const url = URL.createObjectURL(blob)
@@ -398,16 +413,43 @@ export default function Home() {
           {/* Results Preview */}
           {data.length > 0 && !loading && (
             <div className="mb-6">
-              <h3 className="text-lg font-medium text-gray-900 mb-3">変換結果プレビュー</h3>
+              <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between mb-3">
+                <h3 className="text-lg font-medium text-gray-900">変換結果プレビュー</h3>
+                <div className="flex flex-wrap gap-4 text-sm text-gray-700">
+                  <span className="font-medium">緯度経度の格納形式:</span>
+                  <label className="inline-flex items-center gap-1 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="coordinate-format"
+                      value="separate"
+                      checked={coordinateFormat === "separate"}
+                      onChange={() => setCoordinateFormat("separate")}
+                      className="text-blue-600 focus:ring-blue-500"
+                    />
+                    2列（緯度 / 経度）
+                  </label>
+                  <label className="inline-flex items-center gap-1 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="coordinate-format"
+                      value="combined"
+                      checked={coordinateFormat === "combined"}
+                      onChange={() => setCoordinateFormat("combined")}
+                      className="text-blue-600 focus:ring-blue-500"
+                    />
+                    1列（緯度, 経度）
+                  </label>
+                </div>
+              </div>
               <div className="overflow-x-auto">
                 <table className="min-w-full border-collapse">
                   <thead>
                     <tr className="bg-gray-100">
-                      {["住所", "緯度", "経度", "ステータス"].map((col) => (
-                        <th
-                          key={col}
-                          className="border border-gray-300 px-3 py-2 text-left text-sm font-medium text-gray-700"
-                        >
+                      {(coordinateFormat === "separate"
+                        ? ["住所", "緯度", "経度", "ステータス"]
+                        : ["住所", "緯度・経度", "ステータス"]
+                      ).map((col) => (
+                        <th key={col} className="border border-gray-300 px-3 py-2 text-left text-sm font-medium text-gray-700">
                           {col}
                         </th>
                       ))}
@@ -422,15 +464,23 @@ export default function Home() {
                         .join("")
                       return (
                         <tr key={idx} className="hover:bg-gray-50">
-                          <td className="border border-gray-300 px-3 py-2 text-sm">
-                            {displayAddress}
-                          </td>
-                          <td className="border border-gray-300 px-3 py-2 text-sm">
-                            {row.latitude?.toFixed(6) || "-"}
-                          </td>
-                          <td className="border border-gray-300 px-3 py-2 text-sm">
-                            {row.longitude?.toFixed(6) || "-"}
-                          </td>
+                          <td className="border border-gray-300 px-3 py-2 text-sm">{displayAddress}</td>
+                          {coordinateFormat === "separate" ? (
+                            <>
+                              <td className="border border-gray-300 px-3 py-2 text-sm">
+                                {typeof row.latitude === "number" ? row.latitude.toFixed(6) : "-"}
+                              </td>
+                              <td className="border border-gray-300 px-3 py-2 text-sm">
+                                {typeof row.longitude === "number" ? row.longitude.toFixed(6) : "-"}
+                              </td>
+                            </>
+                          ) : (
+                            <td className="border border-gray-300 px-3 py-2 text-sm">
+                              {typeof row.latitude === "number" && typeof row.longitude === "number"
+                                ? `${row.latitude.toFixed(6)}, ${row.longitude.toFixed(6)}`
+                                : "-"}
+                            </td>
+                          )}
                           <td className="border border-gray-300 px-3 py-2 text-sm">
                             <span
                               className={`px-2 py-1 rounded text-xs font-medium ${
