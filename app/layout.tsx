@@ -33,6 +33,15 @@ export default function RootLayout({
             `,
           }}
         />
+        {/* Supabase & Auth */}
+        <Script
+          src="/scripts/supabase.js"
+          strategy="beforeInteractive"
+        />
+        <Script
+          src="/scripts/dataviz-auth-client.js"
+          strategy="afterInteractive"
+        />
       </head>
       <body className="bg-gray-50">{children}</body>
     </html>
