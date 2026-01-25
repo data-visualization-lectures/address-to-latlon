@@ -17,7 +17,7 @@
    npm run dev
    ```
 
-   デフォルトでは `http://localhost:3000` で確認できます。ファイルを編集するとホットリロードされます。
+   http://localhost:3000/?auth_debug
 
 ## ビルド
 
