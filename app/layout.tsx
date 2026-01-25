@@ -35,11 +35,11 @@ export default function RootLayout({
         />
         {/* Supabase & Auth */}
         <Script
-          src="/scripts/supabase.js"
+          src="https://auth.dataviz.jp/lib/supabase.js"
           strategy="beforeInteractive"
         />
         <Script
-          src="/scripts/dataviz-auth-client.js"
+          src="https://auth.dataviz.jp/lib/dataviz-auth-client.js"
           strategy="afterInteractive"
         />
       </head>
