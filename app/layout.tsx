@@ -43,7 +43,7 @@ export default function RootLayout({
           strategy="afterInteractive"
         />
       </head>
-      <body className="bg-gray-50">{children}</body>
+      <body className="bg-gray-50 pt-12">{children}</body>
     </html>
   )
 }
