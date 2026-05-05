@@ -4,3 +4,9 @@
 
 [build.environment]
   NETLIFY_NEXT_PLUGIN_SKIP = "true"
+
+[[redirects]]
+  from = "https://address-to-latlon.dataviz.jp/*"
+  to = "https://address-to-latlon.dataprep.jp/:splat"
+  status = 301
+  force = true
